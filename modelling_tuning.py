@@ -7,7 +7,6 @@ from sklearn.metrics import accuracy_score, precision_score, f1_score
 from mlflow.models import infer_signature
 from dotenv import load_dotenv
 import os
-import joblib
 
 # Load kredensial dari .env
 load_dotenv()
@@ -28,8 +27,8 @@ mlflow.set_experiment("Crop Recommendation - Random Forest + GridSearch")
 try:
     X_train = pd.read_csv("data_preprocessing/X_train.csv")
     X_test = pd.read_csv("data_preprocessing/X_test.csv")
-    y_train = pd.read_csv("data_preprocessing/y_train.csv").values.ravel()
-    y_test = pd.read_csv("data_preprocessing/y_test.csv").values.ravel()
+    y_train = pd.read_csv("data_preprocessing/y_train.csv").values.squeeze()
+    y_test = pd.read_csv("data_preprocessing/y_test.csv").values.squeeze()
 except FileNotFoundError as e:
     print(f"Error: Pastikan file dataset ada di folder 'data_preprocessing/'.\n{e}")
     exit()
@@ -63,11 +62,17 @@ with mlflow.start_run(run_name="RF_GridSearch_Manual_DagsHub"):
     mlflow.log_metric("f1_score_macro", f1)
     mlflow.log_metric("precision_macro", precision)
 
+    # Buat signature dari input dan output model
+    y_sample = best_model.predict(X_train.iloc[:5])
+    signature = infer_signature(X_train.iloc[:5], y_sample)
+    
     # Simpan model secara lokal
-    joblib.dump(best_model, "best_model.pkl")
-
-    # Log file model ke MLflow (manual artifact logging)
-    mlflow.log_artifact("best_model.pkl")
+    mlflow.sklearn.log_model(
+        sk_model=best_model,
+        artifact_path="model",
+        signature=signature,
+        input_example=X_train.iloc[:5]
+    )
 
     print(f"[INFO] Best Params: {grid_search.best_params_}")
     print(f"[INFO] Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}")
